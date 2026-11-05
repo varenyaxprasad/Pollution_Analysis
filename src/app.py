@@ -15,11 +15,11 @@ except Exception as exc:
     IMPORT_ERROR = str(exc)
 else:
     IMPORT_ERROR = None
-
+# setting the page 
 st.set_page_config(page_title="Interactive Pollution Dashboard", page_icon="🌍", layout="wide")
 st.title("🌍 Interactive Pollution Analytics Dashboard")
 st.caption("Select a city and date range to update every KPI, chart, and insight. Dataset values may be synthetic.")
-
+# number of pollutants
 POLLUTANTS = ["PM2.5", "PM10", "NO2", "SO2", "CO", "O3"]
 METRICS = POLLUTANTS + ["AQI", "Water_pollution", "Land_pollution"]
 
