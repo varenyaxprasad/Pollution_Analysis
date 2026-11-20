@@ -1,4 +1,5 @@
 import base64
+import html
 import json
 from datetime import date, timedelta
 from pathlib import Path
@@ -95,199 +96,237 @@ def metric_label(metric):
 
 
 def find_wallpapers():
-    """Find wallpaper images in assets/wallpapers and Downloads."""
+    """Use only the pollution photo supplied for the dashboard wallpaper."""
     project_root = Path(__file__).resolve().parent.parent
-    wallpaper_dir = project_root / "assets" / "wallpapers"
-    wallpaper_dir.mkdir(parents=True, exist_ok=True)
-
-    extensions = {".jpg", ".jpeg", ".png", ".webp"}
-    files = [
-        path
-        for path in wallpaper_dir.iterdir()
-        if path.is_file() and path.suffix.lower() in extensions
-    ]
-
-    downloads = Path.home() / "Downloads"
-    supplied_images = [
-        downloads / "gettyimages-2167761164-1024x1024.jpg",
-        downloads / "photo-environment-pollution_731790-164062.webp",
-    ]
-    files.extend(path for path in supplied_images if path.is_file())
-
-    unique_files = []
-    seen = set()
-
-    for path in files:
-        resolved = str(path.resolve()).casefold()
-        if resolved not in seen:
-            seen.add(resolved)
-            unique_files.append(path)
-
-    return unique_files
+    wallpaper = project_root / "assets" / "wallpapers" / "photo-environment-pollution_731790-164062.webp"
+    return [wallpaper] if wallpaper.is_file() else []
 
 
 def add_wallpaper():
-    """Add a blurred image slideshow behind the dashboard."""
+    """Show the supplied pollution photo as one softly blurred background."""
     images = find_wallpapers()
     if not images:
         return
 
-    count = len(images)
-    duration = max(24, count * 12)
-    interval = 100 / count
-    fade = min(3, interval / 5)
-
-    layers = []
-    animation_css = []
-
-    for index, path in enumerate(images):
-        try:
-            raw_image = path.read_bytes()
-        except OSError:
-            continue
-
-        mime_type = {
-            ".jpg": "image/jpeg",
-            ".jpeg": "image/jpeg",
-            ".png": "image/png",
-            ".webp": "image/webp",
-        }.get(path.suffix.lower(), "image/jpeg")
-
-        encoded_image = base64.b64encode(raw_image).decode("ascii")
-        animation_name = f"wallpaperFade{index}"
-        start = index * interval
-        end = (index + 1) * interval
-        fade_in_end = min(start + fade, end)
-        fade_out_start = max(start, end - fade)
-
-        animation_css.append(
-            f"""
-            @keyframes {animation_name} {{
-                0% {{ opacity: 0; }}
-                {start:.4f}% {{ opacity: 0; }}
-                {fade_in_end:.4f}% {{ opacity: 0.34; }}
-                {fade_out_start:.4f}% {{ opacity: 0.34; }}
-                {end:.4f}% {{ opacity: 0; }}
-                100% {{ opacity: 0; }}
-            }}
-
-            .wallpaper-image-{index} {{
-                animation: {animation_name} {duration}s linear infinite;
-            }}
-            """
-        )
-
-        layers.append(
-            f"""
-            <img
-                class="wallpaper-image wallpaper-image-{index}"
-                src="data:{mime_type};base64,{encoded_image}"
-                alt=""
-            />
-            """
-        )
-
-    if not layers:
+    try:
+        raw_image = images[0].read_bytes()
+    except OSError:
         return
 
+    encoded_image = base64.b64encode(raw_image).decode("ascii")
     wallpaper_html = f"""
     <style>
         .stApp {{
-            background-color: #0b1116 !important;
+            background-color: #080b10 !important;
+            color: #e8edf2 !important;
         }}
-
+        [data-testid="stMainBlockContainer"] {{
+            max-width: 1700px;
+            padding-top: 1.5rem;
+            padding-bottom: 3rem;
+        }}
+        h1, h2, h3 {{
+            letter-spacing: -0.035em;
+        }}
+        h1 {{
+            font-size: clamp(2rem, 3vw, 3rem) !important;
+            margin-bottom: 0.25rem !important;
+        }}
+        [data-testid="stMetric"] {{
+            background: linear-gradient(145deg, rgba(25, 29, 36, .94), rgba(13, 17, 23, .96));
+            border: 1px solid rgba(255, 154, 77, .18);
+            border-radius: 12px;
+            padding: 14px 16px;
+            min-height: 104px;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.035);
+        }}
+        [data-testid="stMetricLabel"] {{
+            color: #9ca6b1 !important;
+            font-size: .78rem !important;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+        }}
+        [data-testid="stMetricValue"] {{
+            color: #f5f7f9 !important;
+            font-size: 1.8rem !important;
+        }}
+        [data-testid="stTabs"] button {{
+            color: #a8b0ba;
+            font-size: .9rem;
+        }}
+        [data-testid="stTabs"] button[aria-selected="true"] {{
+            color: #ffad67 !important;
+            border-bottom-color: #ff914d !important;
+        }}
+        [data-testid="stSidebar"] h2 {{
+            color: #f3f5f7;
+            letter-spacing: .02em;
+        }}
+        [data-testid="stSidebar"] label {{
+            color: #c3cbd3 !important;
+        }}
+        [data-testid="stButton"] button[kind="primary"] {{
+            background: linear-gradient(100deg, #ff754d, #ff9c4a) !important;
+            border: 1px solid rgba(255, 190, 125, .55) !important;
+            color: #fff !important;
+            font-weight: 700 !important;
+            box-shadow: 0 6px 20px rgba(255, 117, 77, .2);
+        }}
+        [data-testid="stButton"] button[kind="primary"]:hover {{
+            background: linear-gradient(100deg, #ff8b58, #ffb15f) !important;
+            transform: translateY(-2px);
+            box-shadow: 0 9px 25px rgba(255, 117, 77, .34);
+        }}
+        [data-testid="stPlotlyChart"] {{
+            background: rgba(10, 14, 20, .88);
+            border: 1px solid rgba(255, 255, 255, .08);
+            border-radius: 13px;
+            padding: 5px;
+            box-shadow: 0 10px 30px rgba(0,0,0,.16);
+        }}
+        .monitor-heading {{
+            border-left: 3px solid #ff914d;
+            padding: 2px 0 4px 16px;
+            margin: 5px 0 20px;
+        }}
+        .monitor-heading .eyebrow {{
+            color: #ffad67;
+            font-size: .72rem;
+            font-weight: 700;
+            letter-spacing: .16em;
+            text-transform: uppercase;
+        }}
+        .monitor-heading p {{
+            color: #9ca6b1;
+            margin: 0;
+        }}
+        .section-kicker {{
+            color: #ffad67;
+            font-size: .72rem;
+            font-weight: 700;
+            letter-spacing: .14em;
+            text-transform: uppercase;
+            margin: 12px 0 2px;
+        }}
         [data-testid="stAppViewContainer"],
         [data-testid="stMain"],
         [data-testid="stHeader"] {{
             background: transparent !important;
         }}
-
         [data-testid="stMainBlockContainer"] {{
             position: relative;
             z-index: 2;
             background: transparent !important;
         }}
-
         [data-testid="stSidebar"] {{
             position: relative;
             z-index: 3;
-            background: rgba(10, 16, 21, 0.9) !important;
+            background: rgba(10, 16, 21, 0.91) !important;
             border-right: 1px solid rgba(255, 255, 255, 0.1);
         }}
-
         .wallpaper-stage {{
             position: fixed;
-            inset: -2%;
+            inset: -14px;
             z-index: 0;
             overflow: hidden;
             pointer-events: none;
             background: #0b1116;
         }}
-
-        .wallpaper-image {{
+        .wallpaper-stage img {{
             position: absolute;
-            inset: -2%;
-            width: 104%;
-            height: 104%;
+            inset: 0;
+            width: 100%;
+            height: 100%;
             object-fit: cover;
             object-position: center;
-            opacity: 0;
-            filter: blur(3px) brightness(0.52) saturate(0.9);
-            transform: scale(1.08);
-            will-change: opacity, transform;
-            animation: wallpaperDrift 48s ease-in-out infinite alternate;
+            filter: blur(4px) brightness(0.68) saturate(0.9);
+            transform: scale(1.03);
         }}
-
         .wallpaper-shade {{
             position: absolute;
             inset: 0;
-            background: linear-gradient(
-                110deg,
-                rgba(4, 10, 14, 0.42),
-                rgba(4, 10, 14, 0.68)
-            );
+            background: rgba(5, 10, 14, 0.38);
         }}
-
-        [data-testid="stPlotlyChart"] {{
-            background: rgba(8, 12, 17, 0.28);
-            border: 1px solid rgba(255, 255, 255, 0.07);
-            border-radius: 14px;
-            padding: 6px;
-        }}
-
         .dashboard-card {{
-            background: rgba(13, 25, 31, 0.72);
-            border: 1px solid rgba(130, 210, 255, 0.16);
-            border-radius: 16px;
-            padding: 18px 20px;
-            margin-bottom: 10px;
-            backdrop-filter: blur(8px);
+            background: linear-gradient(120deg, rgba(20, 25, 32, .96), rgba(12, 17, 23, .95));
+            border: 1px solid rgba(255, 145, 77, .22);
+            border-radius: 13px;
+            padding: 16px 19px;
+            margin: 10px 0 14px;
+            backdrop-filter: blur(10px);
+            transition: transform .28s ease, border-color .28s ease, box-shadow .28s ease;
         }}
-
-        {"".join(animation_css)}
-
-        @keyframes wallpaperDrift {{
-            0% {{ transform: scale(1.08) translateX(-0.5%); }}
-            100% {{ transform: scale(1.13) translateX(0.5%); }}
+        [data-testid="stMetric"],
+        [data-testid="stPlotlyChart"] {{
+            transition: transform .28s ease, border-color .28s ease, box-shadow .28s ease;
         }}
-
-        @media (prefers-reduced-motion: reduce) {{
-            .wallpaper-image {{
-                animation: none !important;
-                opacity: 0.28 !important;
+        [data-testid="stMetric"]:hover,
+        [data-testid="stPlotlyChart"]:hover,
+        .dashboard-card:hover {{
+            transform: translateY(-4px);
+            border-color: rgba(255, 145, 77, .48);
+            box-shadow: 0 14px 34px rgba(0, 0, 0, .3), 0 0 18px rgba(255, 145, 77, .08);
+        }}
+        @keyframes scrollReveal {{
+            from {{ opacity: 0; transform: translateY(34px) scale(.985); filter: blur(4px); }}
+            to {{ opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }}
+        }}
+        @keyframes scrollProgress {{
+            to {{ transform: scaleX(1); }}
+        }}
+        @supports (animation-timeline: view()) {{
+            [data-testid="stPlotlyChart"],
+            [data-testid="stMetric"],
+            .dashboard-card {{
+                animation: scrollReveal .75s ease both;
+                animation-timeline: view();
+                animation-range: entry 0% entry 48%;
             }}
         }}
+        @supports (animation-timeline: scroll()) {{
+            body::before {{
+                content: "";
+                position: fixed;
+                z-index: 999999;
+                inset: 0 auto auto 0;
+                width: 100%;
+                height: 3px;
+                transform: scaleX(0);
+                transform-origin: left center;
+                background: linear-gradient(90deg, #ff744f, #ffba69, #55c6d8);
+                box-shadow: 0 0 12px rgba(255, 145, 77, .65);
+                animation: scrollProgress linear both;
+                animation-timeline: scroll(root block);
+            }}
+            .wallpaper-stage img {{
+                animation: wallpaperParallax linear both;
+                animation-timeline: scroll(root block);
+            }}
+            @keyframes wallpaperParallax {{
+                from {{ transform: scale(1.03) translateY(-1%); }}
+                to {{ transform: scale(1.12) translateY(3%); }}
+            }}
+        }}
+        @media (prefers-reduced-motion: reduce) {{
+            *, *::before, *::after {{
+                scroll-behavior: auto !important;
+                animation-duration: .01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: .01ms !important;
+            }}
+            .wallpaper-stage img {{ transform: none; }}
+        }}
     </style>
-
-    <div class="wallpaper-stage">
-        {"".join(layers)}
+    <div class="wallpaper-stage" aria-hidden="true">
+        <img src="data:image/webp;base64,{encoded_image}" alt="" />
         <div class="wallpaper-shade"></div>
     </div>
     """
 
     if hasattr(st, "html"):
         st.html(wallpaper_html)
-
+    else:
+        st.markdown(wallpaper_html, unsafe_allow_html=True)
 
 def style_chart(fig):
     """Make charts transparent over the wallpaper."""
@@ -675,12 +714,6 @@ def correlation_view(data):
 
 add_wallpaper()
 
-st.title("🌍 Interactive Pollution Analytics Dashboard")
-st.caption(
-    "Explore air, water, and land pollution for a city and date range. "
-    "Generated values are synthetic."
-)
-
 
 if "pollution_data" not in st.session_state:
     st.session_state.pollution_data = load_dataset()
@@ -701,6 +734,19 @@ with st.sidebar:
         max_value=12,
         value=6,
     )
+
+    generation_type_label = st.selectbox(
+        "Pollution data to generate",
+        ["Air only", "Water only", "Land & soil only", "All pollution types"],
+        index=0,
+        help="Generate only the selected pollution group to reduce API usage.",
+    )
+    generation_type = {
+        "Air only": "air",
+        "Water only": "water",
+        "Land & soil only": "land",
+        "All pollution types": "all",
+    }[generation_type_label]
 
     generate = st.button(
         "🚀 Generate / Add City",
@@ -728,6 +774,7 @@ if generate:
             result = generate_pollution_data(
                 city_to_generate,
                 months_to_generate,
+                pollution_type=generation_type,
                 progress_callback=lambda value: progress.progress(
                     max(0.0, min(1.0, float(value)))
                 ),
@@ -736,20 +783,19 @@ if generate:
             new_df = pd.DataFrame(result.get("data", []))
             old_df = st.session_state.pollution_data
 
-            if not old_df.empty and "location" in old_df.columns:
-                old_df = old_df[
-                    old_df["location"].astype(str).str.casefold()
-                    != city_to_generate.casefold()
-                ]
-                combined = pd.concat([old_df, new_df], ignore_index=True)
-            else:
-                combined = new_df
-
+            # Combine by city/date while keeping prior pollutant groups. The
+            # selected group's new values update its columns; other groups stay.
+            combined = pd.concat([old_df, new_df], ignore_index=True, sort=False)
             if "date" in combined.columns and "location" in combined.columns:
-                combined = combined.drop_duplicates(
-                    subset=["date", "location"],
-                    keep="last",
+                combined["date"] = pd.to_datetime(
+                    combined["date"], errors="coerce"
                 )
+                combined = (
+                    combined.dropna(subset=["date"])
+                    .groupby(["date", "location"], as_index=False, sort=False)
+                    .last()
+                )
+                combined["date"] = combined["date"].dt.strftime("%Y-%m-%d")
 
             st.session_state.pollution_data = combined
             st.session_state.selected_city = city_to_generate
@@ -828,6 +874,18 @@ with st.sidebar:
     )
 
 
+st.markdown(
+    f"""
+    <div class="monitor-heading">
+      <div class="eyebrow">Pollution intelligence · monitoring console</div>
+      <h1>{html.escape(selected_city)} Environmental Monitor</h1>
+      <p>Interactive air, water and soil monitoring · generated sample data</p>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
+
 filtered = df[df["location"] == selected_city].copy()
 start_date = None
 end_date = None
@@ -887,18 +945,6 @@ aqi_change = get_previous_period_change(
 )
 
 
-st.markdown(
-    f"""
-    <div class="dashboard-card">
-        <h2 style="margin:0;">📍 {selected_city}</h2>
-        <p style="margin:6px 0 0 0; opacity:.78;">
-            {len(filtered):,} records in the selected date range
-        </p>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
-
 k1, k2, k3, k4 = st.columns(4)
 
 k1.metric(
@@ -934,48 +980,75 @@ overview_tab, air_tab, water_tab, land_tab, correlation_tab, data_tab = st.tabs(
 
 
 with overview_tab:
-    st.subheader("AQI summary for the selected period")
+    st.markdown('<div class="section-kicker">Air quality · selected period</div>', unsafe_allow_html=True)
+    summary_columns = st.columns([1, 1, 1, 1.4])
+    summary_columns[0].metric("Peak AQI date", maximum_aqi_date)
+    summary_columns[1].metric("Cleanest AQI date", minimum_aqi_date)
+    summary_columns[2].metric(
+        "Change vs prior period",
+        f"{aqi_change:+.1f}" if aqi_change is not None else "—",
+        help="Difference in average AQI compared with the previous equal-length period.",
+    )
+    summary_columns[3].metric("Selected location", selected_city)
 
-    aqi_columns = st.columns(5)
-    aqi_columns[0].metric(
-        "Average AQI",
-        f"{average_aqi:.1f}" if pd.notna(average_aqi) else "N/A",
-    )
-    aqi_columns[1].metric(
-        "Maximum AQI",
-        f"{maximum_aqi:.1f}" if pd.notna(maximum_aqi) else "N/A",
-    )
-    aqi_columns[2].metric(
-        "Maximum AQI date",
-        maximum_aqi_date,
-    )
-    aqi_columns[3].metric(
-        "Minimum AQI",
-        f"{minimum_aqi:.1f}" if pd.notna(minimum_aqi) else "N/A",
-    )
-    aqi_columns[4].metric(
-        "Minimum AQI date",
-        minimum_aqi_date,
-    )
+    gauge_column, trend_column = st.columns([1, 2.4], gap="large")
+    with gauge_column:
+        if pd.notna(average_aqi):
+            gauge = go.Figure(
+                go.Indicator(
+                    mode="gauge+number",
+                    value=average_aqi,
+                    number={"suffix": " AQI", "valueformat": ".1f"},
+                    title={"text": "PERIOD AVERAGE"},
+                    gauge={
+                        "axis": {"range": [0, 300], "tickcolor": "#aeb7c0"},
+                        "bar": {"color": "#ff914d", "thickness": 0.24},
+                        "bgcolor": "rgba(0,0,0,0)",
+                        "borderwidth": 0,
+                        "steps": [
+                            {"range": [0, 50], "color": "#244b3d"},
+                            {"range": [50, 100], "color": "#665729"},
+                            {"range": [100, 200], "color": "#663d2b"},
+                            {"range": [200, 300], "color": "#582e34"},
+                        ],
+                    },
+                )
+            )
+            gauge.update_layout(height=310, margin=dict(l=24, r=24, t=65, b=20))
+            st.plotly_chart(
+                style_chart(gauge),
+                use_container_width=True,
+                key="overview_aqi_gauge",
+            )
+        else:
+            st.info("AQI values are missing from this selection.")
 
-    st.caption(
-        "These results use only the selected city and date range."
-    )
-
-    chart_left, chart_right = st.columns(2)
-
-    with chart_left:
+    with trend_column:
         if not aqi_data.empty and "date" in aqi_data.columns:
+            ordered_aqi = aqi_data.sort_values("date")
             fig = px.area(
-                aqi_data.sort_values("date"),
+                ordered_aqi,
                 x="date",
                 y="AQI",
                 markers=True,
-                title="AQI over the selected period",
+                title="AQI trend · daily readings",
             )
             fig.update_traces(
-                line=dict(color="#62c6ff", width=3),
-                fillcolor="rgba(76, 190, 255, 0.18)",
+                line=dict(color="#ff9b55", width=3),
+                fillcolor="rgba(255, 145, 77, 0.15)",
+                hovertemplate="%{x|%d %b %Y}<br>AQI %{y:.1f}<extra></extra>",
+            )
+            if pd.notna(maximum_aqi):
+                max_row = aqi_data.loc[aqi_data["AQI"].idxmax()]
+                fig.add_trace(go.Scatter(
+                    x=[max_row["date"]], y=[maximum_aqi], mode="markers+text",
+                    name="Period high", text=[f"HIGH {maximum_aqi:.0f}"],
+                    textposition="top center", marker={"color": "#ff655d", "size": 11},
+                    hovertemplate=f"Maximum AQI {maximum_aqi:.1f}<br>{maximum_aqi_date}<extra></extra>",
+                ))
+            fig.update_layout(
+                xaxis_title="", yaxis_title="AQI", height=310,
+                showlegend=False, margin=dict(l=35, r=25, t=55, b=35),
             )
             st.plotly_chart(
                 style_chart(fig),
@@ -985,69 +1058,77 @@ with overview_tab:
         else:
             st.info("AQI or date values are missing from the data.")
 
-    with chart_right:
-        compare_metrics = [
-            metric
-            for metric in selected_air_metrics
-            if metric in filtered.columns
-        ]
+    st.markdown('<div class="section-kicker">Pollutant activity · air profile</div>', unsafe_allow_html=True)
+    profile_column, heatmap_column = st.columns(2, gap="large")
+    compare_metrics = [
+        metric for metric in selected_air_metrics
+        if metric in filtered.columns and filtered[metric].notna().any()
+    ]
 
+    with profile_column:
         if compare_metrics:
             averages = (
-                filtered[compare_metrics]
-                .mean(numeric_only=True)
-                .rename_axis("Pollutant")
-                .reset_index(name="Average")
+                filtered[compare_metrics].mean(numeric_only=True)
+                .rename_axis("Pollutant").reset_index(name="Average")
             )
             averages["Pollutant"] = averages["Pollutant"].map(metric_label)
-
             fig = px.bar(
-                averages,
-                x="Average",
-                y="Pollutant",
-                orientation="h",
-                color="Average",
-                color_continuous_scale="Teal",
-                title="Average selected air pollutants",
+                averages.sort_values("Average"),
+                x="Average", y="Pollutant", orientation="h",
+                color="Average", color_continuous_scale=["#67412c", "#ff914d"],
+                title="Average selected pollutant levels",
             )
             fig.update_layout(
-                coloraxis_showscale=False,
+                coloraxis_showscale=False, height=340,
                 yaxis={"categoryorder": "total ascending"},
+                xaxis_title="Average reading", margin=dict(l=25, r=20, t=55, b=35),
             )
             st.plotly_chart(
-                style_chart(fig),
-                use_container_width=True,
+                style_chart(fig), use_container_width=True,
                 key="overview_air_average_bar",
             )
         else:
             st.info("Choose air pollutants in the sidebar to compare them.")
 
-    st.divider()
-    st.subheader("Water pH summary")
+    with heatmap_column:
+        if compare_metrics and "date" in filtered.columns:
+            daily = filtered.groupby(filtered["date"].dt.date)[compare_metrics].mean()
+            zscores = daily.copy()
+            for metric in compare_metrics:
+                deviation = daily[metric].std()
+                zscores[metric] = (
+                    (daily[metric] - daily[metric].mean()) / deviation
+                    if pd.notna(deviation) and deviation > 0
+                    else 0
+                )
+            fig = px.imshow(
+                zscores.T,
+                x=[day.strftime("%d %b") for day in zscores.index],
+                y=[metric_label(metric) for metric in compare_metrics],
+                aspect="auto", color_continuous_scale="Oranges",
+                zmin=-2, zmax=2,
+                title="Daily pollutant pattern · relative to period average",
+                labels={"x": "Date", "y": "Pollutant", "color": "Deviation"},
+            )
+            fig.update_layout(height=340, margin=dict(l=25, r=20, t=55, b=55))
+            st.plotly_chart(
+                style_chart(fig), use_container_width=True,
+                key="overview_air_pattern_heatmap",
+            )
 
-    water_ph_column, _ = st.columns([1, 1])
-
-    with water_ph_column:
+    st.markdown('<div class="section-kicker">Water & soil indicators</div>', unsafe_allow_html=True)
+    water_column, soil_column = st.columns(2, gap="large")
+    with water_column:
         ph_summary_chart(
-            filtered,
-            metric="Water_pH",
-            title="Water pH: average, maximum, and minimum",
-            chart_key="overview_water_ph_summary",
-            line_color="#43c6db",
+            filtered, metric="Water_pH",
+            title="Water pH · average, peak and low",
+            chart_key="overview_water_ph_summary", line_color="#55c6d8",
         )
-
-    st.divider()
-    st.subheader("Soil pH summary")
-
-    soil_ph_column, _ = st.columns([1, 1])
-
-    with soil_ph_column:
+    with soil_column:
         ph_summary_chart(
-            filtered,
-            metric="Land_pH",
-            title="Soil pH: average, maximum, and minimum",
-            chart_key="overview_soil_ph_summary",
-            line_color="#70c78a",
+            filtered, metric="Land_pH",
+            title="Soil pH · average, peak and low",
+            chart_key="overview_soil_ph_summary", line_color="#8bcf72",
         )
 
 
